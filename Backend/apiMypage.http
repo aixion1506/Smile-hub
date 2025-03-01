@@ -1,0 +1,60 @@
+@server = http://localhost:8000
+@productId = 41
+
+#로그인한 유저
+@userId = 3 
+
+
+### 로그인
+POST {{server}}/login
+Content-Type: application/json ; charset=UTF-8
+
+{
+    "email":"user2@example.com",
+    "password":"Userr!!12"
+}
+
+### 찜 내역 삭제
+DELETE  {{server}}/mypage/likesdelete?productId={{productId}}
+Content-Type: application/json ; charset=UTF-8
+
+### 결제페이지에서 결제 하기 버튼 클릭시 
+POST {{server}}/mypage/payment
+Content-Type: application/json ; charset=UTF-8
+
+{
+    "productId": {{productId}}
+}
+
+### 마이페이지
+GET {{server}}/mypage
+
+### 마이페이지 - 구매/판매/찜 내역
+POST {{server}}/mypage
+Content-Type: application/json ; charset=UTF-8
+
+{
+    "mypageList": "likes"
+}
+
+### 판매 내역 - 상품 수락/거절/발송완료
+POST {{server}}/mypage/issell
+Content-Type: application/json ; charset=UTF-8
+
+{
+    "productId": {{productId}},
+    "status": "send"
+}
+
+
+### 마이페이지(구매내역) - 상품확인완료/거절 버튼
+POST {{server}}/mypage/check
+Content-Type: application/json ; charset=UTF-8
+
+{
+    "productId": {{productId}},
+    "price": 4000,
+    "status": "yes",
+    "userId": 1
+}
+

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>채팅 시작하기</title>
+    <link rel="stylesheet" href="index.css" />
+  </head>
+  <body>
+    <div id="chat-container">
+      <input id="token-input" type="text" placeholder="토큰을 입력하세요." />
+      <button id="fetch-user-button">사용자 정보 가져오기</button>
+      <p id="user-info"></p>
+
+      <input
+        id="product-id-input"
+        type="number"
+        placeholder="상품 ID를 입력하세요."
+      />
+      <button id="fetch-product-button" style="display: none">
+        상품 정보 가져오기
+      </button>
+      <p id="product-info"></p>
+
+      <button id="show-rooms-button" style="display: none">
+        채팅방 목록 보기
+      </button>
+      <button id="start-chat-button" style="display: none">
+        새 채팅 시작하기
+      </button>
+      <div id="room-list" style="display: none">
+        <h3>채팅방 목록</h3>
+        <ul id="room-list-items"></ul>
+      </div>
+
+      <div id="chat-box" style="display: none">
+        <div id="messages"></div>
+        <div style="display: flex">
+          <input
+            id="message-input"
+            type="text"
+            placeholder="메시지를 입력하세요."
+            style="flex: 1"
+          />
+          <button id="send-button">전송</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      let socket;
+      let roomId;
+      let userId;
+      let userNickname;
+      let buyerId;
+      let sellerId;
+      let senderId;
+      let receiverId;
+      let product;
+      let productId;
+      let token;
+
+      // 사용자 정보 가져오기 버튼 클릭
+      document.getElementById("fetch-user-button").onclick = async () => {
+        token = document.getElementById("token-input").value;
+
+        if (!token) {
+          alert("토큰을 입력하세요.");
+          return;
+        }
+
+        try {
+          const response = await fetch("/user/token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ token }),
+          });
+
+          if (response.ok) {
+            const user = await response.json();
+            userId = user.userId;
+            userNickname = user.nickname;
+            document.getElementById(
+              "user-info"
+            ).textContent = `사용자 ID: ${userId}, 닉네임: ${userNickname}`;
+            document.getElementById("fetch-product-button").style.display =
+              "inline-block";
+            document.getElementById("start-chat-button").style.display =
+              "inline-block";
+            document.getElementById("show-rooms-button").style.display =
+              "inline-block";
+          } else {
+            alert("사용자를 찾을 수 없습니다.");
+          }
+        } catch (error) {
+          console.error("사용자 정보 가져오기 중 오류 발생:", error);
+        }
+      };
+
+      // 상품 정보 가져오기 버튼 클릭
+      document.getElementById("fetch-product-button").onclick = async () => {
+        productId = document.getElementById("product-id-input").value;
+
+        if (!productId) {
+          alert("상품 ID를 입력하세요.");
+          return;
+        }
+
+        try {
+          const response = await fetch(`/product/read?productId=${productId}`, {
+            method: "GET",
+          });
+
+          if (response.ok) {
+            product = await response.json();
+
+            if (product && product.userId) {
+              sellerId = product.userId; // 상품 등록자 = 판매자
+              document.getElementById(
+                "product-info"
+              ).textContent = `상품: ${product.productName} (ID: ${product.productId}), 판매자 ID: ${sellerId}`;
+            } else {
+              alert("상품을 찾을 수 없습니다.");
+            }
+          } else {
+            alert("상품을 찾을 수 없습니다.");
+          }
+        } catch (error) {
+          console.error("상품 정보 가져오기 중 오류 발생:", error);
+          alert("상품 정보를 가져오는 중 오류가 발생했습니다.");
+        }
+      };
+
+      // 채팅방 목록 보여주기 버튼 클릭
+      document.getElementById("show-rooms-button").onclick = async () => {
+        try {
+          const response = await fetch("/room/list", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ token }),
+          });
+
+          if (response.ok) {
+            const rooms = await response.json();
+            console.log("🚀 ~ document.getElementById ~ rooms:", rooms);
+
+            const roomList = document.getElementById("room-list-items");
+            roomList.innerHTML = "";
+
+            if (Array.isArray(rooms)) {
+              rooms.forEach((room) => {
+                const listItem = document.createElement("li");
+                listItem.textContent = `채팅방 ID: ${room.roomId}, 상품 ID: ${room.productId}`;
+
+                const joinButton = document.createElement("button");
+                joinButton.textContent = "접속";
+                joinButton.onclick = () => {
+                  roomId = room.roomId;
+                  console.log("채팅방 ID:", roomId);
+
+                  buyerId = room.buyerId;
+                  sellerId = room.sellerId;
+
+                  // senderId는 현재 사용자(userId)로 설정
+                  senderId = userId;
+
+                  // receiverId는 senderId가 buyerId인지 sellerId인지에 따라 설정
+                  receiverId = senderId === buyerId ? sellerId : buyerId;
+
+                  productId = room.productId;
+
+                  startChat(roomId);
+                };
+
+                listItem.appendChild(joinButton);
+                roomList.appendChild(listItem);
+              });
+            } else {
+              console.error("배열형식이 아닙니다.", rooms);
+            }
+
+            document.getElementById("room-list").style.display = "block";
+
+            // 새 채팅 시작하기 버튼 표시
+            document.getElementById("start-chat-button").style.display =
+              "inline-block";
+          } else {
+            alert("채팅방을 찾을 수 없습니다.");
+          }
+        } catch (error) {
+          console.error("채팅방 목록 가져오기 중 오류 발생:", error);
+        }
+      };
+
+      // 새 채팅 시작하기 버튼 클릭
+      document.getElementById("start-chat-button").onclick = async () => {
+        buyerId = userId; // 현재 사용자가 구매자
+        senderId = buyerId; // 채팅 시작 시 구매자가 처음 메시지를 보냄
+
+        try {
+          const response = await fetch("/room", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId, buyerId, sellerId }),
+          });
+          console.log(
+            "🚀 ~ document.getElementById ~  productId, buyerId, sellerId:",
+            productId,
+            buyerId,
+            sellerId
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            roomId = data.roomId;
+
+            console.log("룸아이디:", roomId);
+            console.log("구매자 아이디:", buyerId);
+            console.log("판매자 아이디:", sellerId);
+            console.log("상품아이디:", productId);
+
+            // receiverId 설정
+            receiverId = sellerId;
+
+            startChat(roomId);
+          } else {
+            alert("해당 상품은 본인이 판매자인 상품입니다.");
+          }
+        } catch (error) {
+          console.error("채팅방 생성 중 오류 발생:", error);
+        }
+      };
+
+      // 채팅 시작 함수
+      const startChat = async (roomId) => {
+        socket = io();
+
+        try {
+          // 지난 메시지 기록 가져오기
+          const response = await fetch(`/message/${roomId}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const messages = await response.json();
+            const messagesContainer = document.getElementById("messages");
+            messagesContainer.innerHTML = "";
+
+            messages.forEach((message) => {
+              const messageElement = document.createElement("div");
+
+              // senderId가 현재 유저의 userId와 같은지 확인하여 보낸 메시지인지, 받은 메시지인지 구분
+              if (message.senderId === userId) {
+                messageElement.classList.add("message", "sent"); // 보낸 메시지
+              } else {
+                messageElement.classList.add("message", "received"); // 받은 메시지
+              }
+
+              // 닉네임과 메시지 내용을 함께 표시
+              messageElement.textContent = `${message.Sender.nickname}: ${message.messageText}`;
+              messagesContainer.appendChild(messageElement);
+            });
+
+            messagesContainer.scrollTop = messagesContainer.scrollHeight; // 메시지가 쌓이면 자동 스크롤
+          } else {
+            console.error("지난 메시지 기록이 없거나 조회에 실패했습니다.");
+          }
+        } catch (error) {
+          console.error("지난 메시지 기록을 불러오는 중 오류 발생:", error);
+        }
+
+        // 실시간 메시지 수신 핸들러
+        socket.on("receiveMessage", (message) => {
+          const messages = document.getElementById("messages");
+          const messageElement = document.createElement("div");
+
+          if (message.senderId === userId) {
+            messageElement.classList.add("message", "sent");
+          } else {
+            messageElement.classList.add("message", "received");
+          }
+
+          messageElement.textContent = `${message.senderNickname}: ${message.messageText}`;
+          messages.appendChild(messageElement);
+          messages.scrollTop = messages.scrollHeight;
+        });
+
+        socket.emit("joinRoom", { roomId, senderId, productId });
+        console.log(
+          "🚀 ~ startChat ~ roomId, senderId, productId:",
+          roomId,
+          senderId,
+          productId
+        );
+        console.log("들어간 채팅방 아이디:", roomId);
+
+        document.getElementById("chat-box").style.display = "block";
+      };
+
+      // 메세지 보내기 함수
+      const sendMessage = () => {
+        const messageText = document.getElementById("message-input").value;
+        if (messageText.trim() !== "") {
+          socket.emit("sendMessage", {
+            roomId,
+            senderId,
+            messageText,
+          });
+
+          document.getElementById("message-input").value = "";
+        }
+      };
+
+      document
+        .getElementById("send-button")
+        .addEventListener("click", sendMessage);
+
+      // 입력이 완전히 끝났을 때만 메시지를 전송 // IME 처리에서 한글 마지막 글자가 추가로 메세지 보내지는 경우 해결 방법
+      let isComposing = false;
+
+      document
+        .getElementById("message-input")
+        .addEventListener("compositionstart", () => {
+          isComposing = true;
+        });
+
+      document
+        .getElementById("message-input")
+        .addEventListener("compositionend", () => {
+          isComposing = false;
+        });
+
+      document
+        .getElementById("message-input")
+        .addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && !isComposing) {
+            event.preventDefault();
+            sendMessage();
+          }
+        });
+    </script>
+  </body>
+</html>

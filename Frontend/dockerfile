@@ -1,0 +1,29 @@
+# 1. Node.js 이미지를 불러와요 (React 빌드에 사용)
+FROM node:16 AS build
+
+# 2. 작업할 폴더를 만들고 거기로 이동
+WORKDIR /app
+
+# 3. package.json과 package-lock.json 복사
+COPY package*.json ./
+
+# 4. npm install
+RUN npm install
+
+# 5. 나머지 React 소스 복사
+COPY . .
+
+# 6. 프로덕션용 빌드 만들기
+RUN npm run build
+
+# 7. 실제 서비스에 쓰일 nginx 이미지를 불러옴
+FROM nginx:stable-alpine
+
+# 8. 앞서 build 단계에서 만든 결과물을 nginx의 html 폴더에 복사
+COPY --from=build /app/build /usr/share/nginx/html
+
+# 9. 80번 포트를 사용한다고 알려줌
+EXPOSE 80
+
+# 10. nginx 실행(컨테이너가 시작되면 자동 실행)
+CMD ["nginx", "-g", "daemon off;"]
