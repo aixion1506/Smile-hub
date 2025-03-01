@@ -10,7 +10,7 @@ services:
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${DB_PORT}:${DB_PORT}"
+      - ${DB_PORT}:${DB_PORT}
     volumes:
       - dbdata:/var/lib/mysql
 
@@ -21,11 +21,15 @@ services:
       dockerfile: Dockerfile
     container_name: my-backend
     environment:
-      DBHOST: ${DB_HOST}
-      DBUSER: ${DB_USER}
-      DBPW: ${DB_PASSWORD}
-      DB: ${DB_NAME}
-      DBDIALECT: ${DB_DIALECT}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_DIALECT: ${DB_DIALECT}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     depends_on:
