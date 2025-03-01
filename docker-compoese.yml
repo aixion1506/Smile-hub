@@ -1,0 +1,46 @@
+version: "3"
+services:
+  # 1) MySQL DB
+  db:
+    image: mysql:5.7
+    container_name: my-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    volumes:
+      - dbdata:/var/lib/mysql
+
+  # 2) 백엔드
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: my-backend
+    environment:
+      DBHOST: ${DB_HOST}
+      DBUSER: ${DB_USER}
+      DBPW: ${DB_PASSWORD}
+      DB: ${DB_NAME}
+      DBDIALECT: ${DB_DIALECT}
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    depends_on:
+      - db
+
+  # 3) 프론트엔드
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: my-frontend
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    depends_on:
+      - backend
+
+volumes:
+  dbdata:
