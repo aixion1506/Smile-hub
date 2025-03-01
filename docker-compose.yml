@@ -2,7 +2,7 @@ version: "3"
 services:
   # 1) MySQL DB
   db:
-    image: mysql:5.7
+    image: mysql:8.0
     container_name: my-db
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
